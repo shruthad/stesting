@@ -1,0 +1,265 @@
+# Build a Reusable AI Agent Simulation Test Generator Skill
+
+You are a senior AI/ML engineer. Build a complete, lightweight, reusable **Simulation Test Generator skill** in my current VS Code workspace.
+
+## 1. Objective
+
+Create a skill that generates simulated user queries from an existing golden dataset for testing AI assistants and agents.
+
+The skill must be **project-independent**. I should be able to reuse it for different projects by providing a new golden dataset, selecting the types of variations I want, and generating a simulation dataset.
+
+**Keep the implementation as simple as possible.** Do not build an agent framework, web UI, database, evaluation dashboard, or unnecessarily complex architecture.
+
+The skill's responsibility is to **generate and validate simulation test cases**, not to execute them against an AI assistant.
+
+## 2. Skill location and structure
+
+Create a skill named `simulation-test-generator` using the skill conventions supported by the current VS Code / GitHub Copilot environment.
+
+Inspect the existing workspace and use the appropriate skill directory and `SKILL.md` format. If the workspace already contains skills, follow their established structure.
+
+Use a minimal folder structure such as:
+
+```text
+simulation-test-generator/
+├── SKILL.md
+├── prompts/
+│   └── variation_rules.md
+├── scripts/
+│   └── dataset_utils.py
+├── examples/
+│   ├── golden_dataset.jsonl
+│   └── simulation_dataset.jsonl
+└── README.md
+```
+
+Add files only when necessary. Do not create separate scripts for every variation type.
+
+The skill must contain clear instructions so that I can invoke it directly from Copilot Chat.
+
+## 3. Input requirements
+
+The user provides a golden dataset in CSV, JSON, or JSONL format.
+
+The minimum required fields are:
+
+* `case_id`: unique identifier for the original test case.
+* `query`: original user query.
+* `expected_response`: expected or approved reference response.
+
+Support configurable column mapping because different projects may use different field names.
+
+Optionally accept:
+
+* Intent or expected agent.
+* Conversation history.
+* Project context and supported capabilities.
+* Available test entities or fixtures.
+* Supported languages.
+* Other relevant metadata.
+
+The optional fields must not be mandatory.
+
+Never modify or overwrite the original golden dataset.
+
+## 4. User interaction
+
+When I invoke the skill, follow this workflow:
+
+1. Identify the golden dataset file. If I have already provided its location, do not ask again.
+2. Display the 18 available variation types in a numbered menu, grouped into A, B, and C.
+3. Ask me which variation types to generate. Support individual selections, multiple selections, an entire group, or all 18 types.
+4. Ask how many variants I want per selected type, per golden query. Default to one.
+5. Ask which generation engine to use only if I have not specified one. Default to **Copilot LLM** without asking me to confirm the default.
+6. Generate the selected variants, validate them, and export the results.
+
+Do not force the user to edit configuration files for ordinary usage.
+
+If I provide all required selections in my initial request, proceed directly without asking redundant questions.
+
+## 5. The 18 selectable variation types
+
+Implement exactly these three groups for version 1.
+
+### Group A — Language variations
+
+These variants should preserve the original user intent and critical information.
+
+**V01 — Paraphrasing:** Rephrase the original query using different wording while retaining its meaning.
+
+**V02 — Typos:** Introduce realistic spelling mistakes, minor grammatical errors, or missing punctuation without changing critical entities such as account identifiers.
+
+**V03 — Casual language:** Rewrite the query using conversational, informal language.
+
+**V04 — Formal language:** Rewrite the query using professional or formal wording.
+
+**V05 — Abbreviations:** Use commonly understood abbreviations or shorthand without making the request unintelligible.
+
+**V06 — Multilingual queries:** Express the same request in another language or use natural code-mixing. Use a language supported by the project when this information is available. Otherwise, make the chosen language explicit in the generated test.
+
+**V07 — Verbose queries:** Expand the query with additional wording while preserving the original request.
+
+**V08 — Contextual noise:** Add realistic but irrelevant information around the original request to test whether the assistant identifies the user's actual objective.
+
+### Group B — Information and constraints
+
+These variants may change the expected outcome. Do not automatically reuse the original expected response.
+
+**V09 — Ambiguous requests:** Modify the query so that more than one reasonable interpretation is possible.
+
+**V10 — Missing information:** Remove a piece of information needed to complete the original task, such as an account identifier, date, document, or other required parameter.
+
+**V11 — Entity substitution:** Replace a relevant entity with another valid entity. Use supplied test fixtures when the replacement requires actual underlying data. Never invent account details, customer records, or other business facts.
+
+**V12 — Additional constraints:** Add a realistic constraint, such as a date range, filter, or condition, while keeping the original task recognizable. Do not add constraints the project cannot meaningfully evaluate.
+
+**V13 — Output-format changes:** Ask for the original information in a different format, such as a short answer, bullet points, or a table.
+
+**V14 — Conflicting information:** Introduce contradictory details or instructions that require the assistant to resolve the conflict or request clarification.
+
+### Group C — Conversations and tasks
+
+**V15 — Multi-intent queries:** Combine the original request with a second related request. The additional request must be meaningful and supported by known project capabilities, or be clearly marked as requiring project-context validation.
+
+**V16 — Multi-turn conversations:** Split the original task into a short, coherent conversation to test conversational context retention. Output the turns as an ordered list of messages.
+
+**V17 — Follow-up corrections:** Generate a conversation in which the user corrects or updates an earlier detail. The expected behavior must reflect the latest valid user instruction.
+
+**V18 — Out-of-scope requests:** Extend or modify the original request to include an unsupported task. Determine what is out of scope from the project's documented capabilities. If these are unavailable, flag the generated test for project-specific review rather than inventing a policy.
+
+**Do not include a fourth group. Do not include prompt injection, jailbreaks, unauthorized-access tests, or tool-failure simulations in version 1.**
+
+## 6. Generation engine
+
+Support two generation modes.
+
+### Default: Copilot LLM
+
+Use the LLM available in the current GitHub Copilot Chat session to generate variants by following the skill's instructions and category-specific prompts.
+
+Do not require an OpenAI API key or another paid API to use this default mode.
+
+Important: Do not assume that a standalone Python script can directly call the model powering the Copilot Chat session. The skill should orchestrate generation through Copilot Chat and use local scripts only for deterministic tasks such as loading datasets, checking schemas, detecting duplicates, and saving outputs.
+
+### Optional: DeepEval
+
+Support an optional DeepEval mode for generating synthetic test cases where its installed APIs support the requested operation.
+
+Before implementing the integration, inspect the currently installed DeepEval version and its available APIs. Do not invent method names or assume that DeepEval natively supports all 18 variation types.
+
+Keep the DeepEval integration optional and isolated from the default Copilot workflow. If DeepEval is not installed or its required model configuration is unavailable, report the missing dependency clearly. Do not silently switch engines.
+
+Avoid adding DeepEval as a mandatory dependency for the skill.
+
+## 7. Expected-response handling
+
+This is a critical requirement.
+
+For meaning-preserving variants, preserve the original expected outcome, provided that the same underlying facts and execution context apply.
+
+For variants that change the task, introduce ambiguity, remove information, or alter entities, do not blindly copy the original golden response.
+
+Instead, generate a short, testable `expected_behavior` describing what the assistant should do.
+
+Use one of the following values in `expected_response_policy`:
+
+* `reuse_reference`: the original expected response remains applicable.
+* `derive_reference`: a modified expected response can be derived from verified information supplied in the input.
+* `behavioral_rubric`: evaluate the expected agent behavior rather than matching an exact response.
+* `requires_review`: insufficient information is available to establish a reliable expectation.
+
+Never fabricate reference facts to fill gaps in the golden dataset.
+
+## 8. Output schema
+
+Export generated test cases to a JSONL file.
+
+Each record must contain:
+
+```json
+{
+  "test_id": "SIM-001",
+  "source_case_id": "G001",
+  "variation_id": "V01",
+  "variation_type": "paraphrasing",
+  "simulated_query": "How much money is available in my account ending in 1234?",
+  "conversation": null,
+  "expected_response": "Your available balance is $5,000.",
+  "expected_behavior": "Identify the correct account and report its available balance.",
+  "expected_response_policy": "reuse_reference",
+  "validation_status": "passed"
+}
+```
+
+For multi-turn cases, use `conversation` as an ordered array of user messages and set `simulated_query` to `null`, unless a final user message is also needed for compatibility with an output format.
+
+Preserve the link to the source golden case in every generated record.
+
+Use consistent variation IDs and output field names across all projects.
+
+## 9. Simple validation
+
+Implement a lightweight validation process.
+
+Check that:
+
+* The generated record follows the output schema.
+* Required fields are populated.
+* The selected variation type matches the transformation performed.
+* Meaning-preserving variations retain the original intent and critical entities.
+* The expected-response policy is appropriate for the generated variation.
+* The output does not contain duplicate test cases.
+* The generated test does not depend on invented project facts.
+
+Use simple Python checks where possible and Copilot-based semantic review where necessary.
+
+Mark cases as `passed`, `requires_review`, or `rejected`.
+
+Do not discard uncertain cases without explanation. Keep review-required cases identifiable in the output or a separate review file.
+
+If a selected variation cannot meaningfully be generated for a particular golden case, skip it and record the reason.
+
+## 10. Expected deliverables
+
+Create the complete working skill in the workspace, including:
+
+1. A usable `SKILL.md` with invocation instructions and the end-to-end workflow.
+2. Prompt instructions covering all 18 variation types.
+3. Minimal Python utilities for input loading, schema validation, deduplication, and output export.
+4. A small sample golden dataset.
+5. A sample simulation output illustrating different variation types.
+6. A concise README explaining how to invoke and use the skill in VS Code Copilot.
+7. Basic tests for the deterministic Python utilities.
+
+The skill should work with a golden dataset containing only `case_id`, `query`, and `expected_response`, while using additional project context when available.
+
+## 11. Acceptance criteria
+
+The implementation is complete when I can:
+
+* Invoke the skill from Copilot Chat.
+* Provide a golden dataset.
+* View and select from the 18 variation types.
+* Specify the number of variants per type.
+* Use Copilot LLM as the default generator without configuring a separate model API.
+* Optionally select DeepEval when configured.
+* Receive a validated JSONL simulation dataset linked to the original golden records.
+* Reuse the same skill with another project's golden dataset without modifying its core code.
+
+## 12. Implementation instructions
+
+First inspect the workspace and identify the appropriate antropic skill conventions. Then **create the files and implement the skill directly**.
+
+Do not stop after proposing an architecture or writing a development plan.
+
+Keep the code readable, the dependencies minimal, and the skill instructions concise.
+
+After implementation, run the available deterministic tests, fix any failures, and show me:
+
+* The final folder structure.
+* How to invoke the skill.
+* An example command or Copilot Chat request using a sample golden dataset.
+* An example of the generated output.
+* Any remaining limitations, especially around DeepEval configuration or semantic validation.
+
+Build the simplest working version that meets these requirements. Do not add features outside the defined scope.
